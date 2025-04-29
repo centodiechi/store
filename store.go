@@ -44,7 +44,7 @@ type Store interface {
 	CloseConn() (err error)
 }
 
-func InitializeStore(provider string, meta PgMeta) (*Store, error) {
+func InitializeStore(provider string, meta PgMeta) (Store, error) {
 	switch provider {
 	// case "redis":
 	// 	store, err := NewRedisStore(meta)
