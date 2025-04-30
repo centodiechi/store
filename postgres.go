@@ -22,7 +22,7 @@ type PgStore struct {
 }
 
 type Record struct {
-	Key        string    `gorm:"primaryKey;index:idx_key,type:text_pattern_ops"`
+	Key        string    `gorm:"primaryKey;index:idx_key"`
 	Value      string    `gorm:"not null"`
 	IsTTLBased bool      `gorm:"column:is_ttl_based;index:idx_is_ttl_based;default:false;not null"`
 	ExpiresAt  time.Time `gorm:"column:expires_at;index:idx_expires_at"`
