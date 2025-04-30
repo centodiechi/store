@@ -34,6 +34,8 @@ type GetKeyValueByTimestampC struct {
 	Err      error
 }
 
+type StoreType any
+
 type Store interface {
 	Get(ctx context.Context, key string) (response []byte, meta *TsMeta, err error)
 	// GetKeyValueByTimestamp(ctx context.Context, pattern, fromTimestamp, toTimestamp string) chan *GetKeyValueByTimestampC
@@ -44,17 +46,17 @@ type Store interface {
 	CloseConn() (err error)
 }
 
-func InitializeStore(provider string, meta PgMeta) (Store, error) {
+func InitializeStore(provider string, meta StoreType) (Store, error) {
 	switch provider {
-	// case "redis":
-	// 	store, err := NewRedisStore(meta)
-	// 	if err != nil {
-	// 		return nil, err
-	// 	}
-	// 	return store, nil
+	case "redis":
+		store, err := NewRedisStore(meta.(RedisMeta))
+		if err != nil {
+			return nil, err
+		}
+		return store, nil
 
 	case "pgsql":
-		store, err := NewPostgresStore(meta)
+		store, err := NewPostgresStore(meta.(PgMeta))
 		if err != nil {
 			return nil, err
 		}
