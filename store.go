@@ -36,7 +36,7 @@ type GetKeyValueByTimestampC struct {
 
 type Store interface {
 	Get(ctx context.Context, key string) (response []byte, meta *TsMeta, err error)
-	GetKeyValueByTimestamp(ctx context.Context, pattern, fromTimestamp, toTimestamp string) chan *GetKeyValueByTimestampC
+	// GetKeyValueByTimestamp(ctx context.Context, pattern, fromTimestamp, toTimestamp string) chan *GetKeyValueByTimestampC
 	GetByQuery(ctx context.Context, pattern, query, rest string) (*QueryPaginatedResponse, error)
 	Set(ctx context.Context, key string, value []byte) (err error)
 	SetWithTTL(ctx context.Context, key string, value []byte, duration time.Duration) (err error)
