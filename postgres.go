@@ -81,15 +81,15 @@ func NewPostgresStore(meta PgMeta) (Store, error) {
 	}
 
 	pgCtx, cancel := context.WithCancel(context.Background())
+	ticker := time.NewTicker(time.Duration(meta.CronInterval) * time.Second)
 	store := &PgStore{
 		db:     db,
 		meta:   meta,
 		pgCtx:  pgCtx,
 		cancel: cancel,
-		ticker: time.NewTicker(time.Duration(meta.CronInterval) * time.Second),
+		ticker: ticker,
 	}
 
-	store.ticker = time.NewTicker(time.Duration(meta.CronInterval) * time.Second)
 	go store.cleanupRoutine()
 	return store, nil
 }
