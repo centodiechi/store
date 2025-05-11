@@ -42,10 +42,24 @@ func NewRedisStore(meta RedisMeta) (Store, error) {
 
 func (r *RedisStore) GetNextID(ctx context.Context) (int64, error) {
 	key := "generator/id"
+
+	exists, err := r.client.Exists(ctx, key).Result()
+	if err != nil {
+		return 0, fmt.Errorf("failed to check if ID exists: %w", err)
+	}
+
+	if exists == 0 {
+		_, err := r.client.Set(ctx, key, 0, 0).Result()
+		if err != nil {
+			return 0, fmt.Errorf("failed to initialize ID: %w", err)
+		}
+	}
+
 	id, err := r.client.Incr(ctx, key).Result()
 	if err != nil {
 		return 0, fmt.Errorf("failed to generate ID: %w", err)
 	}
+
 	return id, nil
 }
 

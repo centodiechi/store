@@ -2,10 +2,8 @@ package store
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
 	"log"
-	"strings"
 	"time"
 
 	"gorm.io/driver/postgres"
@@ -160,142 +158,6 @@ func (s *PgStore) Get(ctx context.Context, key string) (response []byte, meta *T
 	}
 
 	return []byte(record.Value), meta, nil
-}
-
-// func (s *PgStore) GetKeyValueByTimestamp(ctx context.Context, pattern, fromTimestamp, toTimestamp string) chan *GetKeyValueByTimestampC {
-// 	ch := make(chan *GetKeyValueByTimestampC, 100)
-
-// 	go func() {
-// 		defer close(ch)
-
-// 		var fromTime, toTime time.Time
-// 		var err error
-
-// 		if fromTimestamp != "" {
-// 			fromTime, err = time.Parse(time.RFC3339, fromTimestamp)
-// 			if err != nil {
-// 				ch <- &GetKeyValueByTimestampC{
-// 					Response: nil,
-// 					Err:      fmt.Errorf("invalid from timestamp format: %w", err),
-// 				}
-// 				return
-// 			}
-// 		}
-
-// 		if toTimestamp != "" {
-// 			toTime, err = time.Parse(time.RFC3339, toTimestamp)
-// 			if err != nil {
-// 				ch <- &GetKeyValueByTimestampC{
-// 					Response: nil,
-// 					Err:      fmt.Errorf("invalid to timestamp format: %w", err),
-// 				}
-// 				return
-// 			}
-// 		} else {
-// 			toTime = time.Now()
-// 		}
-
-// 		query := s.db.Where("key LIKE ?", strings.ReplaceAll(pattern, "*", "%"))
-
-// 		if !fromTime.IsZero() {
-// 			query = query.Where("ts >= ?", fromTime)
-// 		}
-
-// 		if !toTime.IsZero() {
-// 			query = query.Where("ts <= ?", toTime)
-// 		}
-
-// 		rows, err := query.Model(&Record{}).Rows()
-// 		if err != nil {
-// 			ch <- &GetKeyValueByTimestampC{
-// 				Response: nil,
-// 				Err:      fmt.Errorf("failed to execute query: %w", err),
-// 			}
-// 			return
-// 		}
-// 		defer rows.Close()
-
-// 		for rows.Next() {
-// 			var record Record
-// 			if err := s.db.ScanRows(rows, &record); err != nil {
-// 				ch <- &GetKeyValueByTimestampC{
-// 					Response: nil,
-// 					Err:      fmt.Errorf("failed to scan row: %w", err),
-// 				}
-// 				continue
-// 			}
-
-// 			ch <- &GetKeyValueByTimestampC{
-// 				Response: &KeyValuePair{
-// 					Key:   []byte(record.Key),
-// 					Value: []byte(record.Value),
-// 				},
-// 				Err: nil,
-// 			}
-// 		}
-// 	}()
-
-// 	return ch
-// }
-
-func (s *PgStore) GetByQuery(ctx context.Context, pattern, query, rest string) (*QueryPaginatedResponse, error) {
-	var records []Record
-	var totalRecords int64
-
-	dbQuery := s.db.Where("key LIKE ?", strings.ReplaceAll(pattern, "*", "%"))
-
-	if query != "" {
-		var filters map[string]interface{}
-		if err := json.Unmarshal([]byte(query), &filters); err != nil {
-			return nil, fmt.Errorf("invalid query format: %w", err)
-		}
-
-		for k, v := range filters {
-			dbQuery = dbQuery.Where(k, v)
-		}
-	}
-
-	if err := dbQuery.Model(&Record{}).Count(&totalRecords).Error; err != nil {
-		return nil, fmt.Errorf("failed to count records: %w", err)
-	}
-
-	if rest != "" {
-		var pagination map[string]int
-		if err := json.Unmarshal([]byte(rest), &pagination); err != nil {
-			return nil, fmt.Errorf("invalid pagination format: %w", err)
-		}
-
-		if limit, ok := pagination["limit"]; ok {
-			dbQuery = dbQuery.Limit(limit)
-		}
-
-		if offset, ok := pagination["offset"]; ok {
-			dbQuery = dbQuery.Offset(offset)
-		}
-	}
-
-	dbQuery = dbQuery.Order("ts DESC")
-
-	if err := dbQuery.Find(&records).Error; err != nil {
-		return nil, fmt.Errorf("failed to fetch records: %w", err)
-	}
-
-	queryResponse := make([]QueryResponse, len(records))
-	for i, record := range records {
-		queryResponse[i] = QueryResponse{
-			Data:      []byte(record.Value),
-			CreatedAt: record.Timestamp.Format(time.RFC3339),
-		}
-
-		if record.IsTTLBased {
-			queryResponse[i].ExpiresAt = record.ExpiresAt.Format(time.RFC3339)
-		}
-	}
-
-	return &QueryPaginatedResponse{
-		QueryResponse: queryResponse,
-		TotalRecords:  int(totalRecords),
-	}, nil
 }
 
 func (s *PgStore) Set(ctx context.Context, key string, value []byte) error {
