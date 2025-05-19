@@ -7,6 +7,8 @@ import (
 )
 
 var ErrProviderNotFound = errors.New("STORE_PROVIDER_NOT_FOUND")
+var ErrKeyNotFound = errors.New("KEY_NOT_FOUND")
+var ErrKeyAlreadyExists = errors.New("KEY_ALREADY_EXISTS")
 
 type QueryResponse struct {
 	Data      []byte

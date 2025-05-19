@@ -143,7 +143,7 @@ func (s *PgStore) Get(ctx context.Context, key string) (response []byte, meta *T
 	result := s.db.Where("key = ?", key).First(&record)
 	if result.Error != nil {
 		if result.Error.Error() == "record not found" {
-			return nil, nil, fmt.Errorf("key %s not found", key)
+			return nil, nil, ErrKeyNotFound
 		}
 		return nil, nil, fmt.Errorf("failed to get record: %w", result.Error)
 	}
@@ -174,7 +174,7 @@ func (s *PgStore) Set(ctx context.Context, key string, value []byte) error {
 		return err
 	}
 	if exists {
-		return fmt.Errorf("key %s already exists", key)
+		return ErrKeyAlreadyExists
 	}
 
 	record := Record{
@@ -198,7 +198,7 @@ func (s *PgStore) SetWithTTL(ctx context.Context, key string, value []byte, dura
 		return err
 	}
 	if exists {
-		return fmt.Errorf("%s already exists", key)
+		return ErrKeyAlreadyExists
 	}
 
 	now := time.Now()
