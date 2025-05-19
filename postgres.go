@@ -8,7 +8,6 @@ import (
 
 	"gorm.io/driver/postgres"
 	"gorm.io/gorm"
-	"gorm.io/gorm/clause"
 )
 
 type PgStore struct {
@@ -160,7 +159,24 @@ func (s *PgStore) Get(ctx context.Context, key string) (response []byte, meta *T
 	return []byte(record.Value), meta, nil
 }
 
+func (s *PgStore) keyExists(key string) (bool, error) {
+	var count int64
+	result := s.db.Model(&Record{}).Where("key = ?", key).Count(&count)
+	if result.Error != nil {
+		return false, fmt.Errorf("failed to check if key exists: %w", result.Error)
+	}
+	return count > 0, nil
+}
+
 func (s *PgStore) Set(ctx context.Context, key string, value []byte) error {
+	exists, err := s.keyExists(key)
+	if err != nil {
+		return err
+	}
+	if exists {
+		return fmt.Errorf("key %s already exists", key)
+	}
+
 	record := Record{
 		Key:        key,
 		Value:      string(value),
@@ -168,13 +184,7 @@ func (s *PgStore) Set(ctx context.Context, key string, value []byte) error {
 		Timestamp:  time.Now(),
 	}
 
-	result := s.db.Clauses(
-		clause.OnConflict{
-			Columns:   []clause.Column{{Name: "key"}},
-			DoUpdates: clause.AssignmentColumns([]string{"value", "is_ttl_based", "expires_at", "ts"}),
-		},
-	).Create(&record)
-
+	result := s.db.Create(&record)
 	if result.Error != nil {
 		return fmt.Errorf("failed to set record: %w", result.Error)
 	}
@@ -183,6 +193,14 @@ func (s *PgStore) Set(ctx context.Context, key string, value []byte) error {
 }
 
 func (s *PgStore) SetWithTTL(ctx context.Context, key string, value []byte, duration time.Duration) error {
+	exists, err := s.keyExists(key)
+	if err != nil {
+		return err
+	}
+	if exists {
+		return fmt.Errorf("%s already exists", key)
+	}
+
 	now := time.Now()
 	record := Record{
 		Key:        key,
@@ -192,15 +210,50 @@ func (s *PgStore) SetWithTTL(ctx context.Context, key string, value []byte, dura
 		Timestamp:  now,
 	}
 
-	result := s.db.Clauses(
-		clause.OnConflict{
-			Columns:   []clause.Column{{Name: "key"}},
-			DoUpdates: clause.AssignmentColumns([]string{"value", "is_ttl_based", "expires_at", "ts"}),
-		},
-	).Create(&record)
-
+	result := s.db.Create(&record)
 	if result.Error != nil {
 		return fmt.Errorf("failed to set record with TTL: %w", result.Error)
+	}
+
+	return nil
+}
+
+func (s *PgStore) Update(ctx context.Context, key string, value []byte) error {
+	result := s.db.Model(&Record{}).
+		Where("key = ?", key).
+		Updates(map[string]interface{}{
+			"value":     string(value),
+			"timestamp": time.Now(),
+		})
+
+	if result.Error != nil {
+		return fmt.Errorf("failed to update record: %w", result.Error)
+	}
+
+	if result.RowsAffected == 0 {
+		return fmt.Errorf("key %s not found", key)
+	}
+
+	return nil
+}
+
+func (s *PgStore) UpdateWithTTL(ctx context.Context, key string, value []byte, duration time.Duration) error {
+	now := time.Now()
+	result := s.db.Model(&Record{}).
+		Where("key = ?", key).
+		Updates(map[string]interface{}{
+			"value":        string(value),
+			"is_ttl_based": true,
+			"expires_at":   now.Add(duration),
+			"timestamp":    now,
+		})
+
+	if result.Error != nil {
+		return fmt.Errorf("failed to update record with TTL: %w", result.Error)
+	}
+
+	if result.RowsAffected == 0 {
+		return fmt.Errorf("key %s not found", key)
 	}
 
 	return nil
