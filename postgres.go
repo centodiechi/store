@@ -138,25 +138,20 @@ func createDatabaseIfNotExists(db *gorm.DB, dbName string) error {
 	return nil
 }
 
-func (s *PgStore) Get(ctx context.Context, key string) (response []byte, meta *TsMeta, err error) {
+func (s *PgStore) Get(ctx context.Context, key string) (response []byte, err error) {
 	var record Record
 	result := s.db.Where("key = ?", key).First(&record)
 	if result.Error != nil {
 		if result.Error.Error() == "record not found" {
-			return nil, nil, ErrKeyNotFound
+			return nil, ErrKeyNotFound
 		}
-		return nil, nil, fmt.Errorf("failed to get record: %w", result.Error)
+		return nil, fmt.Errorf("failed to get record: %w", result.Error)
 	}
 
-	meta = &TsMeta{
-		CreatedAt: record.Timestamp.Format(time.RFC3339),
+	if record.IsTTLBased && record.ExpiresAt.Before(time.Now()) {
+		return nil, ErrKeyNotFound
 	}
-
-	if record.IsTTLBased {
-		meta.ExpiresAt = record.ExpiresAt.Format(time.RFC3339)
-	}
-
-	return []byte(record.Value), meta, nil
+	return []byte(record.Value), nil
 }
 
 func (s *PgStore) keyExists(key string) (bool, error) {
@@ -231,7 +226,7 @@ func (s *PgStore) Update(ctx context.Context, key string, value []byte) error {
 	}
 
 	if result.RowsAffected == 0 {
-		return fmt.Errorf("key %s not found", key)
+		return ErrKeyNotFound
 	}
 
 	return nil
@@ -253,7 +248,7 @@ func (s *PgStore) UpdateWithTTL(ctx context.Context, key string, value []byte, d
 	}
 
 	if result.RowsAffected == 0 {
-		return fmt.Errorf("key %s not found", key)
+		return ErrKeyNotFound
 	}
 
 	return nil
