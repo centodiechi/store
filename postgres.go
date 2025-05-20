@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"log"
+	"strings"
 	"time"
 
 	"gorm.io/driver/postgres"
@@ -152,6 +153,23 @@ func (s *PgStore) Get(ctx context.Context, key string) (response []byte, err err
 		return nil, ErrKeyNotFound
 	}
 	return []byte(record.Value), nil
+}
+
+func (s *PgStore) GetUIDFromEmail(ctx context.Context, pattern, email string) (string, error) {
+	var record Record
+	result := s.db.Where("key LIKE ? AND value = ?", pattern, email).First(&record)
+	if result.Error != nil {
+		if result.Error == gorm.ErrRecordNotFound {
+			return "", ErrKeyNotFound
+		}
+		return "", fmt.Errorf("failed to get UID: %w", result.Error)
+	}
+
+	parts := strings.Split(record.Key, "/")
+	if len(parts) == 4 {
+		return parts[2], nil
+	}
+	return "", ErrKeyNotFound
 }
 
 func (s *PgStore) keyExists(key string) (bool, error) {
