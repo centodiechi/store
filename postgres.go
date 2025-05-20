@@ -157,7 +157,7 @@ func (s *PgStore) Get(ctx context.Context, key string) (response []byte, err err
 
 func (s *PgStore) GetUIDFromEmail(ctx context.Context, pattern, email string) (string, error) {
 	var record Record
-	result := s.db.Where("key LIKE ? AND value = ?", pattern, email).First(&record)
+	result := s.db.Where("key LIKE ? AND value = ?$", pattern, email).First(&record)
 	if result.Error != nil {
 		if result.Error == gorm.ErrRecordNotFound {
 			return "", ErrKeyNotFound
