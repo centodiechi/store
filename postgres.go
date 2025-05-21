@@ -113,10 +113,6 @@ func (s *PgStore) cleanExpiredRecords() error {
 	now := time.Now()
 	result := s.db.Where("is_ttl_based = ? AND expires_at <= ?", true, now).Delete(&Record{})
 
-	if result.Error != nil {
-		return fmt.Errorf("failed to delete expired records: %w", result.Error)
-	}
-
 	if result.RowsAffected > 0 {
 		log.Printf("Cleaned up %d expired records", result.RowsAffected)
 	}
@@ -141,7 +137,7 @@ func createDatabaseIfNotExists(db *gorm.DB, dbName string) error {
 
 func (s *PgStore) Get(ctx context.Context, key string) (response []byte, err error) {
 	var record Record
-	result := s.db.Where("key = ?", key).First(&record)
+	result := s.db.WithContext(ctx).Where("key = ?", key).First(&record)
 	if result.Error != nil {
 		if result.Error.Error() == "record not found" {
 			return nil, ErrKeyNotFound
@@ -157,7 +153,7 @@ func (s *PgStore) Get(ctx context.Context, key string) (response []byte, err err
 
 func (s *PgStore) GetUIDFromEmail(ctx context.Context, pattern, email string) (string, error) {
 	var record Record
-	result := s.db.Where("key LIKE ? AND value = ?$", pattern, email).First(&record)
+	result := s.db.WithContext(ctx).Where("key LIKE ? AND value = ?", pattern, email).First(&record)
 	if result.Error != nil {
 		if result.Error == gorm.ErrRecordNotFound {
 			return "", ErrKeyNotFound
